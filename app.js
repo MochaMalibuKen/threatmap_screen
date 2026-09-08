@@ -17,7 +17,7 @@
   const colors={geopolitical:'#d95d79',infrastructure:'#c9a96e',disaster:'#f59e0b',earthquake:'#ff7866',fire:'#ff9d4d'};
 
   const scenes=[
-    {title:'PURE AMBIENT',subtitle:'GLOBAL GEOGRAPHY · QUIET WATCH',center:[12,18],zoom:1.12,layers:[],dwell:85000,pure:true},
+    {title:'PURE AMBIENT',subtitle:'QUIET LIVE WATCH · OPEN-SOURCE SIGNALS',center:[12,18],zoom:1.12,layers:['geopolitical','earthquake','fire','disaster','infrastructure'],dwell:85000,pure:true},
     {title:'GLOBAL OVERVIEW',subtitle:'LIVE + PERIODIC OPEN-SOURCE SIGNALS',center:[8,18],zoom:1.24,layers:['geopolitical','earthquake','fire','disaster','infrastructure'],dwell:80000},
     {title:'GEOPOLITICAL',subtitle:'GDELT MEDIA-GEOGRAPHY SIGNALS · PERIODIC',center:[30,28],zoom:1.55,layers:['geopolitical','infrastructure'],dwell:70000},
     {title:'NATURAL EVENTS',subtitle:'USGS + NASA EONET',center:[-8,8],zoom:1.30,layers:['earthquake','fire','disaster'],dwell:80000}
@@ -123,6 +123,10 @@
     els.app.classList.toggle('pure-scene',!!s.pure);
     if(map&&map.getLayer('land'))map.setPaintProperty('land','fill-color',s.pure?'#0a141b':'#0d1820');
     if(map&&map.getLayer('borders'))map.setPaintProperty('borders','line-opacity',s.pure?.25:.42);
+    Object.keys(layerMeta).forEach(k=>{
+      if(map&&map.getLayer(`glow-${k}`))map.setPaintProperty(`glow-${k}`,'circle-opacity',s.pure?.035:.08);
+      if(map&&map.getLayer(`intel-${k}`))map.setPaintProperty(`intel-${k}`,'circle-opacity',s.pure?(k==='infrastructure'?.34:.48):(k==='infrastructure'?.78:.88));
+    });
   }
 
   function runScene(){
