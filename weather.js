@@ -4,6 +4,7 @@
   const CPOCC_LAT = 33.540405;
   const CPOCC_LON = -81.684814;
   const ALERTS_URL = 'https://api.weather.gov/alerts/active?area=SC';
+  const LOCAL_ALERTS_URL = `https://api.weather.gov/alerts/active?point=${CPOCC_LAT},${CPOCC_LON}`;
   const POINT_URL = `https://api.weather.gov/points/${CPOCC_LAT},${CPOCC_LON}`;
   const REFRESH_MS = 10 * 60 * 1000;
   const APP_NAME = 'VThree Mission Control threatmap_screen';
@@ -95,9 +96,12 @@
 
   async function refreshAlerts() {
     try {
-      const r = await fetch(ALERTS_URL, { headers, cache: 'no-store' });
-      if (!r.ok) throw new Error(String(r.status));
-      const d = await r.json();
+      const [stateResponse, localResponse] = await Promise.all([
+        fetch(ALERTS_URL, { headers, cache: 'no-store' }),
+        fetch(LOCAL_ALERTS_URL, { headers, cache: 'no-store' })
+      ]);
+      if (!stateResponse.ok) throw new Error(String(stateResponse.status));
+      const d = await stateResponse.json();
       const features = (d.features || [])
         .filter(f => f.geometry)
         .map(f => ({
@@ -113,8 +117,16 @@
         }));
       map?.getSource('nws-alerts')?.setData({ type: 'FeatureCollection', features });
       updateAlertBadge((d.features || []).length);
+
+      if (localResponse.ok) {
+        const local = await localResponse.json();
+        renderLocalAlert(local.features || []);
+      } else {
+        renderLocalAlert(null);
+      }
     } catch (_) {
       updateAlertBadge(null);
+      renderLocalAlert(null);
     }
   }
 
@@ -124,9 +136,31 @@
     card = document.createElement('section');
     card.id = 'localWeather';
     card.className = 'local-weather';
-    card.innerHTML = '<div class="eyebrow">CPOCC WEATHER</div><div class="weather-main"><strong>--°</strong><span>Loading NWS…</span></div><div class="weather-meta"><span id="weatherWind">--</span><span id="weatherAlertBadge">ALERTS --</span></div>';
+    card.innerHTML = '<div class="eyebrow">CPOCC WEATHER</div><div class="weather-main"><strong>--°</strong><span>Loading NWS…</span></div><div id="localWeatherAlert" class="local-weather-alert clear">LOCAL · NO ACTIVE ALERT</div><div class="weather-meta"><span id="weatherWind">--</span><span id="weatherAlertBadge">ALERTS --</span></div>';
     document.getElementById('app')?.appendChild(card);
     return card;
+  }
+
+  function renderLocalAlert(features) {
+    ensureWeatherCard();
+    const row = document.getElementById('localWeatherAlert');
+    if (!row) return;
+    if (features == null) {
+      row.textContent = 'LOCAL · ALERT STATUS UNAVAILABLE';
+      row.className = 'local-weather-alert offline';
+      return;
+    }
+    if (!features.length) {
+      row.textContent = 'LOCAL · NO ACTIVE ALERT';
+      row.className = 'local-weather-alert clear';
+      return;
+    }
+    const priority = { Extreme: 4, Severe: 3, Moderate: 2, Minor: 1, Unknown: 0 };
+    const sorted = [...features].sort((a, b) => (priority[b.properties?.severity] || 0) - (priority[a.properties?.severity] || 0));
+    const top = sorted[0].properties || {};
+    row.textContent = `LOCAL · ${top.event || 'NWS ALERT'}${features.length > 1 ? ` +${features.length - 1}` : ''}`;
+    row.className = `local-weather-alert ${(top.severity === 'Extreme' || top.severity === 'Severe') ? 'active' : 'watch'}`;
+    row.title = top.headline || top.description || top.event || 'NWS Alert';
   }
 
   function updateAlertBadge(count) {
